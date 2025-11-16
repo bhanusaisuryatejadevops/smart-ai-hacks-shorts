@@ -1,47 +1,29 @@
 name: Test Single YouTube Short Upload
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # Manual trigger only
 
 jobs:
   test-short:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout the repo
       - uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
-
-      - name: Install system dependencies
+      # 2. Run the pipeline inside Docker (isolated, guaranteed to have moviepy.editor)
+      - name: Run pipeline in Docker
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick python3-venv git
-
-      - name: Create virtual environment
-        run: |
-          python -m venv venv
-          venv/bin/python -m pip install --upgrade pip
-
-      - name: Install MoviePy from GitHub + other dependencies
-        run: |
-          venv/bin/python -m pip install --force-reinstall \
-            git+https://github.com/Zulko/moviepy.git \
-            imageio imageio-ffmpeg decorator numpy Pillow tqdm \
-            openai google-auth google-auth-oauthlib google-api-python-client requests python-dotenv
-
-      - name: Verify moviepy
-        run: |
-          venv/bin/python -c "from moviepy.editor import VideoFileClip; print('MoviePy imported successfully')"
-
-      - name: Run pipeline
+          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim bash -c "
+            apt-get update && apt-get install -y ffmpeg imagemagick git && \
+            python -m pip install --upgrade pip && \
+            pip install git+https://github.com/Zulko/moviepy.git imageio imageio-ffmpeg decorator numpy Pillow tqdm \
+            openai google-auth google-auth-oauthlib google-api-python-client requests python-dotenv && \
+            python run_pipeline.py
+          "
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
-        run: |
-          venv/bin/python run_pipeline.py
