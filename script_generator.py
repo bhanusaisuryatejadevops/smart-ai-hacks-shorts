@@ -2,6 +2,7 @@
 import os
 import openai
 import logging
+
 openai.api_key = os.getenv("OPENAI_API_KEY")
 logger = logging.getLogger(__name__)
 
@@ -16,13 +17,13 @@ Script:
 def generate_script(topic: str) -> str:
     prompt = PROMPT_TEMPLATE.format(topic=topic)
     try:
-        resp = openai.ChatCompletion.create(
+        resp = openai.chat.completions.create(
             model="gpt-4o-mini",
             messages=[{"role":"user","content": prompt}],
             max_tokens=220,
             temperature=0.7
         )
-        text = resp["choices"][0]["message"]["content"].strip()
+        text = resp.choices[0].message.content.strip()
         return text
     except Exception as e:
         logger.exception("OpenAI script generation failed, falling back to simple template")
