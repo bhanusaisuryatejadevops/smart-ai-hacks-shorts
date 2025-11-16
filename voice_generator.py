@@ -1,46 +1,48 @@
 # voice_generator.py
 import os
-import openai
-import base64
 import logging
 from pathlib import Path
-openai.api_key = os.getenv("OPENAI_API_KEY")
-logger = logging.getLogger(__name__)
+import importlib.util
+import subprocess
 
+import openai
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+logger = logging.getLogger(__name__)
 OUT_DIR = Path("assets/audio")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
-def text_to_speech(text: str, voice: str = "nova-2") -> str:
+# Auto-install gTTS if missing
+if importlib.util.find_spec("gtts") is None:
+    subprocess.check_call([os.sys.executable, "-m", "pip", "install", "gtts"])
+from gtts import gTTS
+
+def text_to_speech(text: str, voice: str = "alloy") -> str:
     """
-    Uses OpenAI TTS endpoint. Saves MP3 to assets/audio/
+    Generate MP3 audio using OpenAI TTS (or fallback to gTTS if quota exceeded)
     Returns path to audio file.
     """
     filename = OUT_DIR / f"voice_{abs(hash(text)) % (10**9)}.mp3"
-    # Use the OpenAI TTS-ish interface. If your OpenAI SDK version differs, adjust accordingly.
+
+    # Try OpenAI TTS
     try:
-        # Modern OpenAI python library for TTS may vary; we'll attempt a generic request
         resp = openai.audio.speech.create(
             model="gpt-4o-mini-tts",
             voice=voice,
             input=text
         )
-        # resp is a bytes-like object in some libs, or has attribute .content
-        audio_bytes = resp if isinstance(resp, (bytes, bytearray)) else resp.read()
+        # write bytes to file
         with open(filename, "wb") as f:
-            if isinstance(audio_bytes, (bytes, bytearray)):
-                f.write(audio_bytes)
-            else:
-                # if resp is a streaming object
-                f.write(audio_bytes)
+            f.write(resp.read() if hasattr(resp, "read") else resp)
         return str(filename)
     except Exception as e:
-        logger.exception("OpenAI TTS failed: %s", e)
-        # fallback to gTTS if OpenAI TTS not available
-        try:
-            from gtts import gTTS
-            tts = gTTS(text=text, lang="en")
-            tts.save(str(filename))
-            return str(filename)
-        except Exception as e2:
-            logger.exception("gTTS fallback failed: %s", e2)
-            raise
+        logger.warning("OpenAI TTS failed (%s), falling back to gTTS.", e)
+
+    # gTTS fallback
+    try:
+        tts = gTTS(text=text, lang="en")
+        tts.save(str(filename))
+        return str(filename)
+    except Exception as e2:
+        logger.error("gTTS fallback failed: %s", e2)
+        raise
