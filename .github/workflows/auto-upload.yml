@@ -1,34 +1,38 @@
 name: Test YouTube Shorts Pipeline
 
 on:
-  workflow_dispatch:  # manual trigger for testing
+  workflow_dispatch:
 
 jobs:
-  test-short:
+  test-moviepy:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies for MoviePy
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick libsm6 libxext6
+          sudo apt-get install -y ffmpeg imagemagick libsm6 libxext6 git
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: 3.11
 
-      - name: Install Python dependencies
+      - name: Create virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
+          # Install MoviePy directly from GitHub for latest fixes
           pip install git+https://github.com/Zulko/moviepy.git
           pip install -r requirements.txt
 
       - name: Test MoviePy import
         run: |
+          source venv/bin/activate
           python -c "from moviepy.editor import VideoFileClip; print('MoviePy imported successfully')"
 
       - name: Run pipeline once
@@ -38,4 +42,6 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
-        run: python run_pipeline.py
+        run: |
+          source venv/bin/activate
+          python run_pipeline.py
