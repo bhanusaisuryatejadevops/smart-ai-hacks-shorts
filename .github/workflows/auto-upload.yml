@@ -1,7 +1,7 @@
 name: Auto YouTube Shorts Upload
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:   # allows manual trigger
   schedule:
     - cron: "0 6 * * *"
     - cron: "0 14 * * *"
@@ -12,31 +12,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # 1. Checkout code
       - uses: actions/checkout@v4
 
+      # 2. Setup Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
+      # 3. Install system dependencies required by moviepy
       - name: Install system dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick python3-venv
 
-      - name: Create and activate virtual environment
+      # 4. Create virtual environment & install Python dependencies
+      - name: Install Python dependencies
         run: |
           python -m venv venv
-          source venv/bin/activate
-          python -m pip install --upgrade pip
+          source venv/bin/activate && python -m pip install --upgrade pip
+          source venv/bin/activate && pip install --upgrade --force-reinstall \
+            moviepy==2.2.1 imageio imageio-ffmpeg decorator numpy Pillow tqdm \
+            openai google-auth google-auth-oauthlib google-api-python-client requests python-dotenv
 
-          # Install MoviePy with all dependencies
-          pip install moviepy==2.2.1 imageio imageio-ffmpeg decorator numpy Pillow tqdm
-
-          # Install other project dependencies
-          pip install openai google-auth google-auth-oauthlib google-api-python-client requests python-dotenv
-
-      - name: Run pipeline
+      # 5. Run your pipeline in the same shell session as venv
+      - name: Run pipeline (generate & upload single short)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -44,5 +45,4 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
         run: |
-          source venv/bin/activate
-          python run_pipeline.py
+          source venv/bin/activate && python run_pipeline.py
