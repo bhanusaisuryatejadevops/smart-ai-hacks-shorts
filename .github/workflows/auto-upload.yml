@@ -1,25 +1,25 @@
 name: Test Single YouTube Short Upload
 
 on:
-  workflow_dispatch:   # Manual trigger only
+  workflow_dispatch:
 
 jobs:
   test-short:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. Checkout the repo
       - uses: actions/checkout@v4
 
-      # 2. Run the pipeline inside Docker (isolated, guaranteed to have moviepy.editor)
-      - name: Run pipeline in Docker
+      - name: Run pipeline in Docker (full Ubuntu)
         run: |
-          docker run --rm -v ${{ github.workspace }}:/app -w /app python:3.11-slim bash -c "
-            apt-get update && apt-get install -y ffmpeg imagemagick git && \
-            python -m pip install --upgrade pip && \
+          docker run --rm -v ${{ github.workspace }}:/app -w /app ubuntu:22.04 bash -c "
+            apt-get update && apt-get install -y \
+              python3 python3-pip python3-venv ffmpeg imagemagick \
+              libsm6 libxext6 git && \
+            python3 -m pip install --upgrade pip && \
             pip install git+https://github.com/Zulko/moviepy.git imageio imageio-ffmpeg decorator numpy Pillow tqdm \
             openai google-auth google-auth-oauthlib google-api-python-client requests python-dotenv && \
-            python run_pipeline.py
+            python3 run_pipeline.py
           "
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
