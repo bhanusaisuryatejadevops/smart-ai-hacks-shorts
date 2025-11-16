@@ -3,39 +3,87 @@ import os
 import subprocess
 from pathlib import Path
 import logging
-import math
+from moviepy.editor import ImageClip, AudioFileClip, concatenate_videoclips, CompositeVideoClip, TextClip
 
 logger = logging.getLogger(__name__)
 OUT_DIR = Path("assets/output")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
+def check_ffmpeg():
+    """Check if ffmpeg is installed and available."""
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
+        logger.info("ffmpeg is installed.")
+    except Exception:
+        logger.error(
+            "ffmpeg not found! Install ffmpeg to enable video generation.\n"
+            "On Ubuntu: sudo apt-get install -y ffmpeg\n"
+            "On Windows: add ffmpeg to PATH"
+        )
+        raise RuntimeError("ffmpeg is required for video generation but not found.")
+
 def make_video_from_assets(audio_path: str, bg_image_paths: list, script_text: str, duration_target: float = None) -> str:
     """
-    Create a 9:16 video by combining background images with audio using ffmpeg.
-    No MoviePy dependency.
+    Create a 9:16 (1080x1920) video by animating the provided background images.
+    audio_path: path to mp3
+    bg_image_paths: list of image paths (square 1080x1080 recommended)
+    script_text: used to generate captions overlay
+    duration_target: if provided, enforce total length; otherwise use audio duration.
     """
-    if len(bg_image_paths) == 0:
-        raise ValueError("No background images provided")
+    check_ffmpeg()  # Ensure ffmpeg is available
+
+    audio = AudioFileClip(audio_path)
+    audio_duration = audio.duration
+    if duration_target is None:
+        duration_target = audio_duration
+
+    per_img = duration_target / max(1, len(bg_image_paths))
+    clips = []
+    for img_path in bg_image_paths:
+        img_clip = ImageClip(img_path).set_duration(per_img).resize(height=1920)
+        # Center crop to 1080x1920
+        img_clip = img_clip.crop(width=1080, height=1920, x_center=img_clip.w/2, y_center=img_clip.h/2)
+        # Optional zoom-in effect
+        img_clip = img_clip.resize(lambda t: 1 + 0.02 * t)
+        clips.append(img_clip)
+
+    video = concatenate_videoclips(clips, method="compose")
+
+    # Generate captions overlay
+    lines = []
+    for paragraph in script_text.split("\n"):
+        paragraph = paragraph.strip()
+        while len(paragraph) > 0:
+            piece = paragraph[:40]
+            if len(paragraph) > 40:
+                idx = piece.rfind(" ")
+                if idx > 10:
+                    piece = paragraph[:idx]
+            lines.append(piece.strip())
+            paragraph = paragraph[len(piece):].strip()
+
+    caption_text = "\n".join(lines[:6])
+    txt_clip = TextClip(caption_text, fontsize=48, color='white', font='Amiri-Bold', method='label', align='center')
+    txt_clip = txt_clip.set_position(('center', 150)).set_duration(duration_target).resize(width=900)
+
+    final = CompositeVideoClip([video, txt_clip])
+    final = final.set_audio(audio)
 
     out_file = OUT_DIR / f"short_{abs(hash(audio_path)) % (10**9)}.mp4"
 
-    # Prepare image list file for ffmpeg
-    list_file = OUT_DIR / "img_list.txt"
-    per_img_duration = 3  # default 3 seconds per image
-    with open(list_file, "w") as f:
-        for img in bg_image_paths:
-            f.write(f"file '{img}'\n")
-            f.write(f"duration {per_img_duration}\n")
-        # repeat last image for audio padding
-        f.write(f"file '{bg_image_paths[-1]}'\n")
+    # Write video file with reasonable settings
+    try:
+        final.write_videofile(
+            str(out_file),
+            fps=30,
+            codec="libx264",
+            audio_codec="aac",
+            threads=2,
+            preset="medium",
+            bitrate="3000k"
+        )
+    except Exception as e:
+        logger.exception("Failed to write video file: %s", e)
+        raise
 
-    # ffmpeg command to create video from images
-    ffmpeg_cmd = [
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(list_file),
-        "-i", audio_path, "-vf", "scale=1080:1920,format=yuv420p",
-        "-c:v", "libx264", "-c:a", "aac", "-shortest", str(out_file)
-    ]
-
-    logger.info(f"Running ffmpeg command: {' '.join(ffmpeg_cmd)}")
-    subprocess.run(ffmpeg_cmd, check=True)
     return str(out_file)
