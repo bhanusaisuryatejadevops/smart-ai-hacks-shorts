@@ -1,41 +1,35 @@
-name: Test YouTube Shorts Pipeline
+name: Test Auto YouTube Shorts Upload
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # allows manual testing from GitHub Actions
 
 jobs:
-  test-moviepy:
+  build-and-run:
     runs-on: ubuntu-latest
 
     steps:
+      # Step 1: Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick libsm6 libxext6 git
-
+      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: 3.11
+          python-version: '3.11'
 
-      - name: Create virtual environment
+      # Step 3: Install dependencies
+      - name: Install Python dependencies
         run: |
-          python -m venv venv
-          source venv/bin/activate
           python -m pip install --upgrade pip
-          # Install MoviePy directly from GitHub for latest fixes
-          pip install git+https://github.com/Zulko/moviepy.git
           pip install -r requirements.txt
 
-      - name: Test MoviePy import
-        run: |
-          source venv/bin/activate
-          python -c "from moviepy.editor import VideoFileClip; print('MoviePy imported successfully')"
+      # Step 4: Install FFmpeg
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      - name: Run pipeline once
+      # Step 5: Run the pipeline once
+      - name: Run pipeline (generate & upload single short)
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
@@ -43,5 +37,4 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
         run: |
-          source venv/bin/activate
           python run_pipeline.py
