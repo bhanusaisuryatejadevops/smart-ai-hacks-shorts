@@ -1,0 +1,36 @@
+# .github/workflows/auto_upload.yml
+name: Auto YouTube Shorts Upload
+
+on:
+  schedule:
+    # runs three times per day — choose times in UTC (customize if you want)
+    - cron: "0 6 * * *"   # 06:00 UTC
+    - cron: "0 14 * * *"  # 14:00 UTC
+    - cron: "0 22 * * *"  # 22:00 UTC
+  workflow_dispatch:
+
+jobs:
+  build-and-run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run pipeline (generate & upload single short)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
+        run: |
+          python run_pipeline.py
