@@ -1,21 +1,22 @@
-name: Test Single YouTube Short Upload
+name: Test YouTube Shorts Pipeline
 
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # manual trigger for testing
 
 jobs:
   test-short:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Install system dependencies
+      - name: Install system dependencies for MoviePy
         run: |
           sudo apt-get update
           sudo apt-get install -y ffmpeg imagemagick libsm6 libxext6
 
-      - name: Set up Python and install Python packages
+      - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
@@ -30,7 +31,7 @@ jobs:
         run: |
           python -c "from moviepy.editor import VideoFileClip; print('MoviePy imported successfully')"
 
-      - name: Run pipeline
+      - name: Run pipeline once
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
