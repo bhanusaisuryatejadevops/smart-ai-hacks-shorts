@@ -22,25 +22,19 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg imagemagick
+          sudo apt-get install -y ffmpeg imagemagick python3-venv
 
-      - name: Install Python dependencies
+      - name: Create and activate virtual environment
         run: |
+          python -m venv venv
+          source venv/bin/activate
           python -m pip install --upgrade pip
-          pip install --upgrade --force-reinstall \
-              moviepy==2.2.1 \
-              imageio==2.31.1 \
-              imageio-ffmpeg==0.4.8 \
-              decorator==5.1.1 \
-              numpy \
-              tqdm \
-              Pillow \
-              openai \
-              google-auth \
-              google-auth-oauthlib \
-              google-api-python-client \
-              requests \
-              python-dotenv
+
+          # Install MoviePy with all dependencies
+          pip install moviepy==2.2.1 imageio imageio-ffmpeg decorator numpy Pillow tqdm
+
+          # Install other project dependencies
+          pip install openai google-auth google-auth-oauthlib google-api-python-client requests python-dotenv
 
       - name: Run pipeline
         env:
@@ -50,4 +44,5 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
         run: |
+          source venv/bin/activate
           python run_pipeline.py
