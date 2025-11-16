@@ -1,35 +1,29 @@
-name: Test Auto YouTube Shorts Upload
+# .github/workflows/auto_upload.yml
+name: Test YouTube Shorts Pipeline
 
 on:
-  workflow_dispatch:  # allows manual testing from GitHub Actions
+  workflow_dispatch:   # Manual trigger for testing
 
 jobs:
-  build-and-run:
+  test-run:
     runs-on: ubuntu-latest
 
     steps:
-      # Step 1: Checkout repo
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Step 2: Set up Python
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # Step 3: Install dependencies
-      - name: Install Python dependencies
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install gtts   # ensure fallback is available
 
-      # Step 4: Install FFmpeg
-      - name: Install FFmpeg
-        run: sudo apt-get update && sudo apt-get install -y ffmpeg
-
-      # Step 5: Run the pipeline once
-      - name: Run pipeline (generate & upload single short)
+      - name: Run pipeline
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
