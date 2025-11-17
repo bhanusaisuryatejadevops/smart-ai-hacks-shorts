@@ -11,7 +11,6 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("voice_generator")
 
 def generate_voice(script_text):
-    """Generate voice using OpenAI → fallback to gTTS."""
     output_path = os.path.join(AUDIO_DIR, f"voice_{os.getpid()}.mp3")
     try:
         logger.info("Trying OpenAI TTS...")
