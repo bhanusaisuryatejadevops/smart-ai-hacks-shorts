@@ -9,10 +9,8 @@ Write a 30-second YouTube Shorts script about a trending AI tool or AI update re
 Make it exciting, simple, and end with: “Follow for more AI updates!”
 Return ONLY the script text.
 """
-
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}]
     )
-
     return response.choices[0].message.content.strip()
