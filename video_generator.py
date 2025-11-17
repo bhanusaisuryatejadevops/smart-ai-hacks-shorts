@@ -1,63 +1,67 @@
-# video_generator.py
 import os
-import subprocess
-from pathlib import Path
-import logging
+from moviepy.editor import *
+import textwrap
 
-logger = logging.getLogger(__name__)
-OUT_DIR = Path("assets/output")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
+ASSETS_DIR = "assets"
+BACKGROUND_DIR = os.path.join(ASSETS_DIR, "background")
+OUTPUT_DIR = os.path.join(ASSETS_DIR, "output")
 
-def _write_img_list(bg_paths, duration_per=3):
-    list_file = OUT_DIR / "img_list.txt"
-    with open(list_file, "w") as f:
-        for p in bg_paths:
-            abs_p = os.path.abspath(p)
-            # ffmpeg concat requires both file and duration lines
-            f.write(f"file '{abs_p}'\n")
-            f.write(f"duration {duration_per}\n")
-        # repeat last file to ensure proper concat behavior
-        f.write(f"file '{os.path.abspath(bg_paths[-1])}'\n")
-    return str(list_file)
 
-def make_video_from_assets(audio_path: str, bg_paths: list, script_text: str = "", duration_per_img: int = 3) -> str:
-    """
-    Create a 9:16 video by concatenating bg_paths and overlaying audio_path.
-    Uses ffmpeg (no MoviePy).
-    Returns path to generated mp4.
-    """
-    # ensure ffmpeg available
-    try:
-        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
-    except Exception:
-        raise RuntimeError("ffmpeg not found. Install ffmpeg in your environment or runner.")
+def generate_caption_clips(script_text, video_duration):
+    """Create MrBeast-style captions."""
+    words = script_text.split()
+    clips = []
+    start = 0
 
-    list_file = _write_img_list(bg_paths, duration_per=duration_per_img)
-    slideshow_path = OUT_DIR / "slideshow.mp4"
-    out_file = OUT_DIR / f"short_{abs(hash(audio_path)) % (10**9)}.mp4"
+    chunk = []
+    for w in words:
+        chunk.append(w)
+        if len(chunk) >= 4:
+            txt = " ".join(chunk)
+            txt_clip = TextClip(
+                txt,
+                fontsize=60,
+                color="white",
+                font="Impact",
+                stroke_color="black",
+                stroke_width=3,
+                method="caption",
+                size=(1080, None)
+            ).set_position(("center", 850)).set_duration(0.6).set_start(start)
 
-    # 1) make slideshow (scale & pad to 1080x1920)
-    cmd_slideshow = [
-        "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", list_file,
-        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
-        "-r", "30",
-        str(slideshow_path)
-    ]
-    logger.info("Running ffmpeg slideshow: %s", " ".join(cmd_slideshow))
-    subprocess.run(cmd_slideshow, check=True)
+            clips.append(txt_clip)
+            start += 0.6
+            chunk = []
 
-    # 2) merge audio and slideshow (shortest)
-    cmd_merge = [
-        "ffmpeg", "-y",
-        "-i", str(slideshow_path),
-        "-i", str(audio_path),
-        "-c:v", "libx264",
-        "-c:a", "aac",
-        "-shortest",
-        str(out_file)
-    ]
-    logger.info("Merging audio + video: %s", " ".join(cmd_merge))
-    subprocess.run(cmd_merge, check=True)
+    return clips
 
-    logger.info("Video generated: %s", out_file)
-    return str(out_file)
+
+def load_background():
+    """Load background video or generate fallback dynamic motion."""
+    files = [f for f in os.listdir(BACKGROUND_DIR) if f.endswith((".mp4", ".mov"))]
+
+    if not files:
+        # fallback animated background (no more 3× colors)
+        clip = ColorClip((1080, 1920), color=(30, 30, 30))
+        return clip.set_duration(30)
+
+    return VideoFileClip(os.path.join(BACKGROUND_DIR, files[0])).resize((1080, 1920))
+
+
+def make_video(script_text, audio_path):
+    if not os.path.exists(OUTPUT_DIR):
+        os.makedirs(OUTPUT_DIR)
+
+    audio = AudioFileClip(audio_path)
+    bg = load_background().set_duration(audio.duration)
+
+    # Captions
+    captions = generate_caption_clips(script_text, audio.duration)
+
+    # Final video
+    final = CompositeVideoClip([bg] + captions).set_audio(audio)
+
+    output_path = os.path.join(OUTPUT_DIR, "short_generated.mp4")
+    final.write_videofile(output_path, fps=30, codec="libx264", audio_codec="aac")
+
+    return output_path
