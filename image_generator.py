@@ -34,7 +34,6 @@ def generate_backgrounds(script_text=None, count=3):
     paths = []
     for i in range(1, count + 1):
         path = BG_DIR / f"bg_{i}.png"
-        # random gradient colors
         a = (random.randint(40, 255), random.randint(40, 255), random.randint(40, 255))
         b = (random.randint(40, 255), random.randint(40, 255), random.randint(40, 255))
         img = _gradient_image(a=a, b=b)
