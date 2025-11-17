@@ -1,5 +1,4 @@
-# .github/workflows/auto_upload.yml
-name: Auto YouTube Shorts Upload
+name: Test Auto YouTube Shorts
 
 on:
   workflow_dispatch:
@@ -7,34 +6,26 @@ on:
 jobs:
   test-run:
     runs-on: ubuntu-latest
-
     steps:
-      # 1️⃣ Checkout your repo
       - uses: actions/checkout@v4
 
-      # 2️⃣ Install Python 3.11
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      # 3️⃣ Install dependencies
-      - name: Install dependencies
+      - name: Install dependencies and ffmpeg
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Install ffmpeg
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          ffmpeg -version
 
-      # 4️⃣ Run pipeline
-      - name: Run pipeline (single short)
+      - name: Run pipeline
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
-        run: |
-          python run_pipeline.py
+        run: python run_pipeline.py
