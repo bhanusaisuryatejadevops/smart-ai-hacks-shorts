@@ -1,73 +1,75 @@
-# video_generator.py
+import os
 import subprocess
-from pathlib import Path
-from PIL import Image, ImageDraw
-import logging
+from PIL import Image
 
-logger = logging.getLogger(__name__)
+OUTPUT_DIR = "assets/output"
+BACKGROUND_DIR = "assets/background"
 
-# -----------------------------
-# 1️⃣ Generate simple backgrounds
-# -----------------------------
-def generate_backgrounds(num_bg=3):
-    bg_dir = Path("assets/background")
-    bg_dir.mkdir(parents=True, exist_ok=True)
-    bg_paths = []
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-    for i in range(1, num_bg + 1):
-        img_path = bg_dir / f"bg_{i}.png"
-        # Create a simple colored gradient background
-        img = Image.new("RGB", (1080, 1080), color=(255, 255, 255))
-        draw = ImageDraw.Draw(img)
-        draw.rectangle([0, 0, 1080, 1080], fill=(i*50 % 256, i*80 % 256, i*120 % 256))
-        img.save(img_path)
-        bg_paths.append(str(img_path))
+def make_video_from_assets(bg_paths, audio_path, output_name="final_video.mp4"):
+    """
+    Generate a final video using background images (or videos) + audio.
+    """
 
-    return bg_paths
+    print("✔ Using background assets:", bg_paths)
+    print("✔ Using audio:", audio_path)
 
-# -----------------------------
-# 2️⃣ Generate img_list.txt for ffmpeg
-# -----------------------------
-def generate_img_list(bg_paths, duration=5):
-    output_file = Path("assets/output/img_list.txt")
-    output_file.parent.mkdir(parents=True, exist_ok=True)
-    lines = []
-    for path in bg_paths:
-        lines.append(f"file '{path}'")
-        lines.append(f"duration {duration}")
-    # repeat last image for ffmpeg compatibility
-    lines.append(f"file '{bg_paths[-1]}'")
-    output_file.write_text("\n".join(lines))
-    return str(output_file)
+    # ----------------------------------------------------
+    # Ensure absolute paths for ffmpeg (THIS FIXES YOUR ERROR)
+    # ----------------------------------------------------
+    abs_bg_paths = [os.path.abspath(p) for p in bg_paths]
+    abs_audio = os.path.abspath(audio_path)
+    abs_output = os.path.abspath(os.path.join(OUTPUT_DIR, output_name))
 
-# -----------------------------
-# 3️⃣ Make video from audio + backgrounds
-# -----------------------------
-def make_video_from_assets(audio_path, script=""):
-    try:
-        # Auto-generate backgrounds
-        bg_paths = generate_backgrounds()
+    # ----------------------------------------------------
+    # 1. Create img_list.txt for ffmpeg slideshow
+    # ----------------------------------------------------
+    img_list_file = os.path.abspath(os.path.join(OUTPUT_DIR, "img_list.txt"))
+    with open(img_list_file, "w") as f:
+        for img in abs_bg_paths:
+            f.write(f"file '{img}'\n")
+            f.write("duration 2\n")   # 2 seconds per slide
 
-        # Auto-generate img_list.txt
-        img_list_file = generate_img_list(bg_paths)
+        # Repeat last frame so slideshow holds
+        f.write(f"file '{abs_bg_paths[-1]}'\n")
 
-        # Output video path
-        output_path = Path("assets/output") / f"short_{abs(hash(script)) % (10**9)}.mp4"
-        output_path.parent.mkdir(parents=True, exist_ok=True)
+    print("✔ Created list:", img_list_file)
 
-        # ffmpeg command
-        ffmpeg_cmd = [
-            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(img_list_file),
-            "-i", str(audio_path),
-            "-vf", "scale=1080:1920,format=yuv420p",
-            "-c:v", "libx264", "-c:a", "aac", "-shortest", str(output_path)
-        ]
+    # ----------------------------------------------------
+    # 2. Create slideshow video (no audio yet)
+    # ----------------------------------------------------
+    slideshow_path = os.path.abspath(os.path.join(OUTPUT_DIR, "slideshow.mp4"))
 
-        logger.info(f"Running ffmpeg command: {' '.join(ffmpeg_cmd)}")
-        subprocess.run(ffmpeg_cmd, check=True)
-        logger.info(f"Video generated: {output_path}")
-        return str(output_path)
+    slideshow_cmd = [
+        "ffmpeg", "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", img_list_file,
+        "-vf", "scale=1080:1920",
+        "-r", "30",
+        slideshow_path
+    ]
 
-    except Exception as e:
-        logger.exception("Failed to generate video")
-        raise
+    print("▶ Running FFmpeg slideshow...")
+    subprocess.run(slideshow_cmd, check=True)
+    print("✔ Slideshow created:", slideshow_path)
+
+    # ----------------------------------------------------
+    # 3. Merge slideshow + audio
+    # ----------------------------------------------------
+    final_cmd = [
+        "ffmpeg", "-y",
+        "-i", slideshow_path,
+        "-i", abs_audio,
+        "-c:v", "copy",
+        "-c:a", "aac",
+        "-shortest",
+        abs_output
+    ]
+
+    print("▶ Running FFmpeg final combine...")
+    subprocess.run(final_cmd, check=True)
+
+    print("🎉 FINAL VIDEO READY:", abs_output)
+    return abs_output
