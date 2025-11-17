@@ -1,4 +1,3 @@
-# run_pipeline.py
 import logging
 from script_generator import generate_script
 from voice_generator import generate_voice
@@ -10,42 +9,33 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(mes
 logger = logging.getLogger(__name__)
 
 def run_once():
-    logger.info("Starting single pipeline run")
+    logger.info("🚀 Starting single pipeline run")
 
-    # 1) pick or generate topic + script
-    topic = None  # None -> generator will use trending/defaults
+    # 1) Generate script (topic = None → auto trending)
+    topic = None
     script = generate_script(topic)
-    logger.info("Generated script (len %d): %s", len(script), script[:200].replace("\n"," ") + "...")
+    logger.info(f"📝 Script generated: {script[:200]}...")
 
-    # 2) get TTS audio (OpenAI TTS attempted; falls back to gTTS)
-    try:
-        audio_path = text_to_speech(script)
-        logger.info("Audio generated: %s", audio_path)
-    except Exception as e:
-        logger.exception("TTS failed completely: %s", e)
-        return
+    # 2) Generate TTS audio  
+    audio_path = generate_voice(script)
+    logger.info(f"🎤 Audio created: {audio_path}")
 
-    # 3) generate backgrounds automatically (returns list of image paths)
-    bg_paths = generate_backgrounds(count=3)
-    logger.info("Background images generated: %s", bg_paths)
+    # 3) Generate backgrounds (AI images)
+    image_paths = generate_backgrounds(script)
+    logger.info(f"🖼️ Generated backgrounds: {image_paths}")
 
-    # 4) make video via ffmpeg
-    try:
-        output_path = make_video_from_assets(audio_path, bg_paths, script_text=script)
-        logger.info("Final video: %s", output_path)
-    except Exception as e:
-        logger.exception("Video generation failed: %s", e)
-        return
+    # 4) Make video (AI images + audio)
+    final_video_path = make_video_from_assets(image_paths, audio_path)
+    logger.info(f"🎬 Final video created: {final_video_path}")
 
-    # 5) upload to YouTube if configured; otherwise log and continue
-    try:
-        if is_youtube_ready():
-            result = upload_video(output_path, title=f"{topic or 'AI Update'} — Smart AI Hacks", description=script)
-            logger.info("Upload result: %s", result)
-        else:
-            logger.warning("YouTube not configured or API not enabled; skipping upload.")
-    except Exception as e:
-        logger.exception("Upload failed (skipping): %s", e)
+    # 5) Upload to YouTube
+    if is_youtube_ready():
+        upload_video(final_video_path, script)
+        logger.info("📤 Uploaded video to YouTube")
+    else:
+        logger.warning("⚠️ Skipped upload — YouTube not configured correctly.")
+
+    logger.info("✅ Pipeline finished successfully!")
 
 if __name__ == "__main__":
     run_once()
