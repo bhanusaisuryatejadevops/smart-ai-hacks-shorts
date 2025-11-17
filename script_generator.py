@@ -4,10 +4,8 @@ import logging
 from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
 logger = logging.getLogger("script_generator")
 
-# fallback topics if no trending AI update is fetched
 DEFAULT_TOPICS = [
     "Insane new AI tool everyone is using",
     "Open-source AI update breaking the internet",
@@ -18,37 +16,26 @@ DEFAULT_TOPICS = [
 ]
 
 def pick_topic():
-    """Returns a random topic from the list."""
     return random.choice(DEFAULT_TOPICS)
 
 def generate_script(topic=None):
-    """
-    Generate a high-energy MrBeast-style AI short script.
-    If no topic is provided, auto-select a trending one.
-    """
-
     if topic is None:
         topic = pick_topic()
-
     logger.info(f"🎯 Selected topic: {topic}")
-
     prompt = f"""
-You are a YouTube Shorts script writer. 
+You are a YouTube Shorts script writer.
 Write a HIGH-ENERGY MrBeast-style script about this topic: "{topic}"
-
 Rules:
-- 20 to 28 seconds 
+- 20 to 28 seconds
 - Fast, punchy, energetic lines
 - Include on-screen captions
 - Add scene directions like [Zoom in], [Flash text], etc.
 - Must end with: "Follow for more AI updates!"
 """
-
     response = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[{"role": "user", "content": prompt}],
         max_tokens=250
     )
-
     script = response.choices[0].message.content.strip()
     return script
