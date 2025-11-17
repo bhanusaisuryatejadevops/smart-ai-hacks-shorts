@@ -1,31 +1,63 @@
 # run_pipeline.py
-import os
 import logging
-from trending import pick_trending_topic
 from script_generator import generate_script
 from voice_generator import text_to_speech
-from background_generator import generate_background_sequence
 from video_generator import make_video_from_assets
-from youtube_upload import upload_video
+from youtube_upload import upload_video, get_youtube_client
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 def run_once():
-    logging.info("Starting single pipeline run")
-    topic = pick_trending_topic()
-    logging.info(f"Selected topic: {topic}")
+    topic = "I did not think it would be this good. Holy shit. I am blown away"
+    logger.info("Starting single pipeline run")
+    logger.info("Selected topic: %s", topic)
+
+    # 1️⃣ Generate script
     script = generate_script(topic)
-    logging.info(f"Generated script (len {len(script)}): {script[:120]}...")
-    audio_path = text_to_speech(script, voice="nova-2")
-    logging.info(f"Audio generated: {audio_path}")
-    bg_paths = generate_background_sequence(topic, count=3)
-    logging.info(f"Background images generated: {bg_paths}")
-    output_path = make_video_from_assets(audio_path, bg_paths, script)
-    logging.info(f"Final video: {output_path}")
-    # Upload
-    upload_result = upload_video(output_path, title=f"{topic} — AI Update", description=script)
-    logging.info(f"Upload result: {upload_result}")
-    return upload_result
+    logger.info("Generated script (len %d): %s", len(script), script[:100] + "...")
+
+    # 2️⃣ Generate audio
+    try:
+        audio_path = text_to_speech(script, voice="en-US-Wavenet-F")
+        logger.info("Audio generated: %s", audio_path)
+    except Exception as e:
+        logger.error("Failed to generate audio: %s", e)
+        return
+
+    # 3️⃣ Generate background images (replace with your actual generator or static assets)
+    bg_paths = [
+        "assets/background/bg_1.png",
+        "assets/background/bg_2.png",
+        "assets/background/bg_3.png"
+    ]
+    logger.info("Background images selected: %s", bg_paths)
+
+    # 4️⃣ Generate video
+    try:
+        output_path = make_video_from_assets(audio_path, bg_paths, script)
+        logger.info("Final video: %s", output_path)
+    except Exception as e:
+        logger.error("Failed to generate video: %s", e)
+        return
+
+    # 5️⃣ Upload to YouTube (graceful fallback if API fails)
+    try:
+        # check if YouTube client is initialized
+        yt_client = get_youtube_client()
+        if yt_client:
+            upload_result = upload_video(
+                output_path,
+                title=f"{topic} — AI Update",
+                description=script,
+                privacy="private"
+            )
+            logger.info("Upload result: %s", upload_result)
+        else:
+            logger.warning("YouTube client not initialized, skipping upload.")
+    except Exception as e:
+        logger.warning("Skipping YouTube upload due to error: %s", e)
+
 
 if __name__ == "__main__":
     run_once()
