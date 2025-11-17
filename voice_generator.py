@@ -1,46 +1,32 @@
 # voice_generator.py
+import requests
 import os
-import logging
-from pathlib import Path
 
-logger = logging.getLogger(__name__)
-OUT_DIR = Path("assets/audio")
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-
-def text_to_speech(text: str, voice: str = "alloy") -> str:
+def generate_voice(text, output_path="assets/audio/output.mp3"):
     """
-    Generate TTS audio. Try OpenAI TTS first; fallback to gTTS if it fails.
-    Returns path to MP3 file.
+    Generate speech using OpenAI TTS and save to output_path.
     """
-    filename = OUT_DIR / f"voice_{abs(hash(text)) % (10**9)}.mp3"
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise ValueError("OPENAI_API_KEY not set")
 
-    # Try OpenAI TTS
-    try:
-        import openai
-        openai.api_key = os.getenv("OPENAI_API_KEY")
-        logger.info("Trying OpenAI TTS...")
-        resp = openai.audio.speech.create(
-            model="gpt-4o-mini-tts",
-            voice=voice,
-            input=text
-        )
-        # resp might have .read() or bytes
-        audio_bytes = resp if isinstance(resp, (bytes, bytearray)) else resp.read()
-        with open(filename, "wb") as f:
-            f.write(audio_bytes)
-        logger.info(f"OpenAI TTS successful: {filename}")
-        return str(filename)
+    url = "https://api.openai.com/v1/audio/speech"
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+    }
 
-    except Exception as e:
-        logger.warning(f"OpenAI TTS failed: {e}, falling back to gTTS...")
+    data = {
+        "model": "gpt-4o-mini-tts",
+        "voice": "alloy",
+        "input": text
+    }
 
-    # Fallback: gTTS
-    try:
-        from gtts import gTTS
-        tts = gTTS(text=text, lang="en")
-        tts.save(str(filename))
-        logger.info(f"gTTS fallback successful: {filename}")
-        return str(filename)
-    except Exception as e2:
-        logger.error(f"gTTS fallback failed: {e2}")
-        raise RuntimeError("Both OpenAI TTS and gTTS failed.") from e2
+    response = requests.post(url, json=data, headers=headers)
+
+    if response.status_code != 200:
+        raise RuntimeError(f"TTS Error: {response.text}")
+
+    with open(output_path, "wb") as f:
+        f.write(response.content)
+
+    return output_path
