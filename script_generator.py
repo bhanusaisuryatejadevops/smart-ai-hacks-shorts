@@ -1,61 +1,44 @@
-# script_generator.py
-import os
-import logging
 import random
+from openai import OpenAI
 
-logger = logging.getLogger(__name__)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Use OpenAI if key present, otherwise fallback to simple templates
-try:
-    import openai
-    OPENAI_AVAILABLE = True
-    openai.api_key = os.getenv("OPENAI_API_KEY")
-except Exception:
-    OPENAI_AVAILABLE = False
+def get_dynamic_topic():
+    prompt = """
+    Give me one viral, trending YouTube Shorts topic related to:
+    - new AI tools
+    - AI updates this week
+    - trending tech news
+    - powerful AI websites
+    Make it short, clickable, and hype.
+    Return ONLY the topic text.
+    """
 
-PROMPT_TEMPLATE = """Write a short energetic 30-45 second YouTube Shorts script about the following trending AI topic.
-Make it hooky in the first 1-2 seconds, add 2 quick benefits, and end with a strong CTA: "Follow for more AI updates!"
-Keep lines short and punchy.
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[{"role": "user", "content": prompt}]
+    )
 
-Topic:
-{topic}
+    return response.choices[0].message["content"].strip()
 
-Script:
-"""
+def generate_script():
+    topic = get_dynamic_topic()
 
-DEFAULT_TOPICS = [
-    "An AI tool that instantly turns text prompts into videos",
-    "A tiny new model that runs locally and still rocks",
-    "An update that makes image-to-text unbelievably accurate",
-    "A productivity AI that automates boring dev tasks",
-    "A surprising new open-source AI release"
-]
+    script_prompt = f"""
+    Create a 30-second, high-energy YouTube Shorts script in MrBeast style
+    based on this topic: "{topic}"
 
-def generate_script(topic: str = None) -> str:
-    if topic is None:
-        topic = random.choice(DEFAULT_TOPICS)
+    Requirements:
+    - very high energy
+    - 3-color caption style (white, yellow, red)
+    - fast-paced storytelling
+    - hook in first 3 seconds
+    - last line must be: "Follow for more AI updates!"
+    """
 
-    prompt = PROMPT_TEMPLATE.format(topic=topic)
+    response = client.chat.completions.create(
+        model="gpt-4.1-mini",
+        messages=[{"role": "user", "content": script_prompt}]
+    )
 
-    if OPENAI_AVAILABLE and openai.api_key:
-        try:
-            # new OpenAI python lib usage
-            resp = openai.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=220,
-                temperature=0.7
-            )
-            text = resp.choices[0].message.content.strip()
-            return text
-        except Exception as e:
-            logger.warning("OpenAI script generation failed: %s — falling back to template", e)
-
-    # fallback template
-    lines = [
-        f"{topic} — you need to see this!",
-        "It can save time and boost your results.",
-        "Super simple to use — you'll love it.",
-        "Follow for more AI updates!"
-    ]
-    return "\n".join(lines)
+    return response.choices[0].message["content"], topic
