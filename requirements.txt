@@ -1,9 +1,9 @@
 openai>=1.0.0
+google-api-python-client>=2.70.0
 google-auth>=2.20.0
 google-auth-oauthlib>=0.8.0
-google-api-python-client>=2.70.0
 requests>=2.30.0
-Pillow>=9.5.0
 python-dotenv>=1.0.0
-tqdm>=4.65.0
+Pillow>=9.5.0
 gtts>=2.3.2
+tqdm>=4.65.0
