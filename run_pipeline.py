@@ -35,7 +35,7 @@ def run_once():
 
     # 4️⃣ Generate video
     try:
-        output_path = make_video_from_assets(audio_path, bg_paths, script)
+        output_path = make_video_from_assets(audio_path, script)
         logger.info("Final video: %s", output_path)
     except Exception as e:
         logger.error("Failed to generate video: %s", e)
