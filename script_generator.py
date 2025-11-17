@@ -1,44 +1,54 @@
 import os
+import random
+import logging
 from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def get_dynamic_topic():
-    prompt = """
-    Give me one viral, trending YouTube Shorts topic related to:
-    - new AI tools
-    - AI updates this week
-    - trending tech news
-    - powerful AI websites
-    Make it short, clickable, and hype.
-    Return ONLY the topic text.
+logger = logging.getLogger("script_generator")
+
+# fallback topics if no trending AI update is fetched
+DEFAULT_TOPICS = [
+    "Insane new AI tool everyone is using",
+    "Open-source AI update breaking the internet",
+    "New AI website going viral today",
+    "AI tool that replaces 10 apps at once",
+    "This AI just changed everything",
+    "Shocking AI upgrade released right now"
+]
+
+def pick_topic():
+    """Returns a random topic from the list."""
+    return random.choice(DEFAULT_TOPICS)
+
+def generate_script(topic=None):
+    """
+    Generate a high-energy MrBeast-style AI short script.
+    If no topic is provided, auto-select a trending one.
     """
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
+    if topic is None:
+        topic = pick_topic()
 
-    return response.choices[0].message["content"].strip()
+    logger.info(f"🎯 Selected topic: {topic}")
 
-def generate_script():
-    topic = get_dynamic_topic()
+    prompt = f"""
+You are a YouTube Shorts script writer. 
+Write a HIGH-ENERGY MrBeast-style script about this topic: "{topic}"
 
-    script_prompt = f"""
-    Create a 30-second, high-energy YouTube Shorts script in MrBeast style
-    based on this topic: "{topic}"
-
-    Requirements:
-    - very high energy
-    - 3-color caption style (white, yellow, red)
-    - fast-paced storytelling
-    - hook in first 3 seconds
-    - last line must be: "Follow for more AI updates!"
-    """
+Rules:
+- 20 to 28 seconds 
+- Fast, punchy, energetic lines
+- Include on-screen captions
+- Add scene directions like [Zoom in], [Flash text], etc.
+- Must end with: "Follow for more AI updates!"
+"""
 
     response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": script_prompt}]
+        model="gpt-4o-mini",
+        messages=[{"role": "user", "content": prompt}],
+        max_tokens=250
     )
 
-    return response.choices[0].message["content"], topic
+    script = response.choices[0].message.content.strip()
+    return script
