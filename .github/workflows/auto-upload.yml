@@ -1,34 +1,40 @@
-name: Test AI Shorts Pipeline
+# .github/workflows/auto_upload.yml
+name: Auto YouTube Shorts Upload
 
 on:
-  workflow_dispatch:  # Allows manual testing from GitHub UI
+  workflow_dispatch:
 
 jobs:
-  test_pipeline:
+  test-run:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      # 1️⃣ Checkout your repo
+      - uses: actions/checkout@v4
 
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: "3.11"
+      # 2️⃣ Install Python 3.11
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
 
-    - name: Install system dependencies
-      run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          # Install ffmpeg
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          ffmpeg -version
 
-    - name: Install Python dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run pipeline
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-        YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-        YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-        CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
-      run: python run_pipeline.py
+      # 4️⃣ Run pipeline
+      - name: Run pipeline (single short)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          CHANNEL_TITLE: ${{ secrets.CHANNEL_TITLE }}
+        run: |
+          python run_pipeline.py
