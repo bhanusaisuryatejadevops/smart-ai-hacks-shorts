@@ -1,4 +1,3 @@
-# youtube_upload.py
 import os
 import logging
 import time
@@ -10,13 +9,11 @@ from googleapiclient.errors import HttpError
 logger = logging.getLogger(__name__)
 
 def is_youtube_ready():
-    # quick check for presence of creds
     return all([os.getenv("YOUTUBE_CLIENT_ID"), os.getenv("YOUTUBE_CLIENT_SECRET"), os.getenv("YOUTUBE_REFRESH_TOKEN")])
 
 def get_youtube_client():
     if not is_youtube_ready():
         raise RuntimeError("YouTube credentials not configured (YOUTUBE_CLIENT_ID/SECRET/REFRESH_TOKEN).")
-
     creds = Credentials(
         token=None,
         refresh_token=os.getenv("YOUTUBE_REFRESH_TOKEN"),
@@ -35,7 +32,6 @@ def upload_video(file_path: str, title: str, description: str = "", privacy: str
     }
     media = MediaFileUpload(file_path, chunksize=-1, resumable=True)
     request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-
     response = None
     while response is None:
         try:
