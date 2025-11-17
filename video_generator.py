@@ -7,17 +7,23 @@ os.makedirs(VIDEO_DIR, exist_ok=True)
 logger = logging.getLogger("video_generator")
 
 def make_video_from_assets(image_paths, audio_path, captions=None):
-    """
-    Creates a video slideshow with captions using FFmpeg.
-    captions: list of strings (one for each image/segment)
-    """
     if captions is None or len(captions) != len(image_paths):
         captions = ["" for _ in image_paths]
 
-    # Set duration per image (change this depending on number of backgrounds and audio duration)
-    duration = 1.3
+    # Dynamically set duration to fit audio
+    # E.g., for a 20s short, 5 images = 4s per image
+    import wave
+    import contextlib
+    audio_len = 20.0
+    try:
+        with contextlib.closing(wave.open(audio_path, 'rb')) as f:
+            frames = f.getnframes()
+            rate = f.getframerate()
+            audio_len = frames / float(rate)
+    except Exception:
+        pass
+    duration = audio_len / len(image_paths)
 
-    # Create individual video segments with text overlay
     segment_paths = []
     for idx, (img, text) in enumerate(zip(image_paths, captions)):
         segment_path = os.path.join(VIDEO_DIR, f"segment_{idx}.mp4")
@@ -37,7 +43,6 @@ def make_video_from_assets(image_paths, audio_path, captions=None):
         subprocess.run(cmd, check=True)
         segment_paths.append(segment_path)
 
-    # Concatenate all segments
     with open("segments.txt", "w") as f:
         for p in segment_paths:
             f.write(f"file '{os.path.abspath(p)}'\n")
@@ -54,7 +59,6 @@ def make_video_from_assets(image_paths, audio_path, captions=None):
     ]
     subprocess.run(cmd, check=True)
 
-    # Add audio, cut or pad to fit
     output_path = os.path.join(VIDEO_DIR, "final_video.mp4")
     cmd = [
         "ffmpeg",
