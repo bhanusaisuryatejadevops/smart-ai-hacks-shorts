@@ -2,32 +2,39 @@ import os
 import subprocess
 import logging
 
-VIDEODIR = "assets/output"
-os.makedirs(VIDEODIR, exist_ok=True)
-logger = logging.getLogger("videogenerator")
+VIDEO_DIR = "assets/output"
+os.makedirs(VIDEO_DIR, exist_ok=True)
+logger = logging.getLogger("video_generator")
 
-def makevideofromassets(imagepaths, audiopath):
+def make_video_from_assets(image_paths, audio_path):
     """
-    Creates a simple slideshow video using FFmpeg with fade transitions for each image.
-    Each image shows for 1.3 seconds, with a 0.5s fade out.
+    Creates a simple slideshow video using FFmpeg.
+    No MoviePy. Fully GitHub-safe.
     """
-
-    outputpath = os.path.join(VIDEODIR, "finalvideo.mp4")
-
-    # Build filter_complex for fades
-    filter_complex = ""
-    duration = 1.3
-    fade_duration = 0.5
-    inputs = ""
-    for idx, img in enumerate(imagepaths):
-        inputs += f" -loop 1 -t {duration} -i {img}"
-        filter_complex += f"[{idx}:v]fade=out:st={duration-fade_duration}:d={fade_duration}[v{idx}];"
-    # Concatenate images with fade
-    streams = "".join([f"[v{i}]" for i in range(len(imagepaths))])
-    filter_complex += f"{streams}concat=n={len(imagepaths)}:v=1:a=0,scale=1080:1920[v]"
-
-    cmd = f"ffmpeg -y{inputs} -i {audiopath} -filter_complex \"{filter_complex}\" -map \"[v]\" -map {len(imagepaths)}:a -c:v libx264 -c:a aac -shortest {outputpath}"
+    output_path = os.path.join(VIDEO_DIR, "final_video.mp4")
+    # Create a temporary text file listing images
+    list_file = "image_list.txt"
+    with open(list_file, "w") as f:
+        for image in image_paths:
+            f.write(f"file '{image}'\n")
+            f.write("duration 1.3\n") # each image shows 1.3 seconds
+        # Repeat last frame to prevent FFmpeg cutoff
+        f.write(f"file '{image_paths[-1]}'\n")
+    # Build FFmpeg command
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-f", "concat",
+        "-safe", "0",
+        "-i", list_file,
+        "-i", audio_path,
+        "-vf", "scale=1080:1920",
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-shortest",
+        output_path
+    ]
     logger.info("Running FFmpeg to create video...")
-    subprocess.run(cmd, shell=True, check=True)
-    logger.info(f"Video created {outputpath}")
-    return outputpath
+    subprocess.run(cmd, check=True)
+    logger.info(f"Video created: {output_path}")
+    return output_path
