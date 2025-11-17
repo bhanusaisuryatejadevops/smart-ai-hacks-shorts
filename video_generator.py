@@ -1,75 +1,69 @@
 import os
 import subprocess
+import logging
 from PIL import Image
 
-OUTPUT_DIR = "assets/output"
-BACKGROUND_DIR = "assets/background"
+logger = logging.getLogger(__name__)
 
+OUTPUT_DIR = "assets/output"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-def make_video_from_assets(bg_paths, audio_path, output_name="final_video.mp4"):
+
+def make_video_from_assets(images, audio_path):
     """
-    Generate a final video using background images (or videos) + audio.
+    Create a slideshow video (1080x1920) from given images + provided audio.
     """
 
-    print("✔ Using background assets:", bg_paths)
-    print("✔ Using audio:", audio_path)
+    # 1️⃣ Create FFmpeg concat file
+    list_file = os.path.join(OUTPUT_DIR, "img_list.txt")
 
-    # ----------------------------------------------------
-    # Ensure absolute paths for ffmpeg (THIS FIXES YOUR ERROR)
-    # ----------------------------------------------------
-    abs_bg_paths = [os.path.abspath(p) for p in bg_paths]
-    abs_audio = os.path.abspath(audio_path)
-    abs_output = os.path.abspath(os.path.join(OUTPUT_DIR, output_name))
+    with open(list_file, "w") as f:
+        for img in images:
+            abs_path = os.path.abspath(img)
+            f.write(f"file '{abs_path}'\n")
+            f.write("duration 2\n")
 
-    # ----------------------------------------------------
-    # 1. Create img_list.txt for ffmpeg slideshow
-    # ----------------------------------------------------
-    img_list_file = os.path.abspath(os.path.join(OUTPUT_DIR, "img_list.txt"))
-    with open(img_list_file, "w") as f:
-        for img in abs_bg_paths:
-            f.write(f"file '{img}'\n")
-            f.write("duration 2\n")   # 2 seconds per slide
+    logger.info(f"✔ Created list: {list_file}")
 
-        # Repeat last frame so slideshow holds
-        f.write(f"file '{abs_bg_paths[-1]}'\n")
+    # 2️⃣ Final MP4 output file
+    video_output = os.path.join(OUTPUT_DIR, "slideshow.mp4")
 
-    print("✔ Created list:", img_list_file)
-
-    # ----------------------------------------------------
-    # 2. Create slideshow video (no audio yet)
-    # ----------------------------------------------------
-    slideshow_path = os.path.abspath(os.path.join(OUTPUT_DIR, "slideshow.mp4"))
-
-    slideshow_cmd = [
-        "ffmpeg", "-y",
+    # 3️⃣ FFmpeg slideshow creation
+    ffmpeg_cmd = [
+        "ffmpeg",
+        "-y",
         "-f", "concat",
         "-safe", "0",
-        "-i", img_list_file,
-        "-vf", "scale=1080:1920",
+        "-i", list_file,
+        "-vf", "scale=1080:1920:force_original_aspect_ratio=decrease,pad=1080:1920:(ow-iw)/2:(oh-ih)/2",
         "-r", "30",
-        slideshow_path
+        video_output,
     ]
 
-    print("▶ Running FFmpeg slideshow...")
-    subprocess.run(slideshow_cmd, check=True)
-    print("✔ Slideshow created:", slideshow_path)
+    logger.info("▶ Running FFmpeg slideshow...")
+    result = subprocess.run(ffmpeg_cmd, text=True)
 
-    # ----------------------------------------------------
-    # 3. Merge slideshow + audio
-    # ----------------------------------------------------
-    final_cmd = [
+    if result.returncode != 0:
+        raise Exception("FFmpeg slideshow generation failed")
+
+    # 4️⃣ Merge slideshow + audio
+    final_video = os.path.join(OUTPUT_DIR, "final_output.mp4")
+
+    merge_cmd = [
         "ffmpeg", "-y",
-        "-i", slideshow_path,
-        "-i", abs_audio,
-        "-c:v", "copy",
+        "-i", video_output,
+        "-i", audio_path,
+        "-c:v", "libx264",
         "-c:a", "aac",
         "-shortest",
-        abs_output
+        final_video
     ]
 
-    print("▶ Running FFmpeg final combine...")
-    subprocess.run(final_cmd, check=True)
+    logger.info("▶ Merging audio + video...")
+    result = subprocess.run(merge_cmd, text=True)
 
-    print("🎉 FINAL VIDEO READY:", abs_output)
-    return abs_output
+    if result.returncode != 0:
+        raise Exception("FFmpeg merge failed")
+
+    logger.info(f"🎉 Final video saved → {final_video}")
+    return final_video
