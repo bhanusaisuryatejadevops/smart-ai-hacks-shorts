@@ -1,7 +1,7 @@
 # run_pipeline.py
 import logging
 from script_generator import generate_script
-from voice_generator import text_to_speech
+from voice_generator import generate_voice
 from image_generator import generate_backgrounds
 from video_generator import make_video_from_assets
 from youtube_upload import upload_video, is_youtube_ready
