@@ -2,7 +2,7 @@ import logging
 from script_generator import generate_script
 from voice_generator import generate_voice
 from image_generator import generate_backgrounds
-from video_generator import make_video_from_assets
+from video_generator import makevideofromassets
 from youtube_upload import upload_video, is_youtube_ready
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
