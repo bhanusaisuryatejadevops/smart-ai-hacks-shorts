@@ -1,56 +1,85 @@
 # youtube_upload.py
 import os
-import json
-import google.auth.transport.requests
-from google.oauth2.credentials import Credentials
+import logging
+import time
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
-import logging
+from google.oauth2.credentials import Credentials
+from googleapiclient.errors import HttpError
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-# These should be set as GitHub Secrets and available at runtime via env vars in Actions
-CLIENT_ID = os.getenv("YOUTUBE_CLIENT_ID")
-CLIENT_SECRET = os.getenv("YOUTUBE_CLIENT_SECRET")
-REFRESH_TOKEN = os.getenv("YOUTUBE_REFRESH_TOKEN")
-SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+def get_youtube_client():
+    """Initialize YouTube API client using credentials from environment variables."""
+    try:
+        creds = Credentials(
+            token=None,
+            refresh_token=os.getenv("YOUTUBE_REFRESH_TOKEN"),
+            client_id=os.getenv("YOUTUBE_CLIENT_ID"),
+            client_secret=os.getenv("YOUTUBE_CLIENT_SECRET"),
+            token_uri="https://oauth2.googleapis.com/token"
+        )
+        youtube = build("youtube", "v3", credentials=creds)
+        return youtube
+    except Exception as e:
+        logger.exception("Failed to initialize YouTube client: %s", e)
+        raise
 
-def get_authenticated_service():
-    creds = Credentials(
-        None,
-        refresh_token=REFRESH_TOKEN,
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=CLIENT_ID,
-        client_secret=CLIENT_SECRET,
-        scopes=SCOPES
-    )
-    # Force refresh to obtain access token
-    request = google.auth.transport.requests.Request()
-    creds.refresh(request)
-    youtube = build("youtube", "v3", credentials=creds, cache_discovery=False)
-    return youtube
-
-def upload_video(file_path: str, title: str, description: str, tags: list = None, privacy="public"):
-    tags = tags or ["AI","shorts","SmartAIHacks"]
-    youtube = get_authenticated_service()
+def upload_video(file_path: str, title: str, description: str, privacy: str = "private", retries: int = 3):
+    """Upload video to YouTube with retries and error handling."""
+    youtube = get_youtube_client()
     body = {
         "snippet": {
             "title": title,
             "description": description,
-            "tags": tags,
-            "categoryId": "28"  # Science & Technology
+            "categoryId": "28",  # 28 = Science & Technology
         },
         "status": {
-            "privacyStatus": privacy,
-            "selfDeclaredMadeForKids": False
+            "privacyStatus": privacy
         }
     }
-    media = MediaFileUpload(file_path, chunksize=-1, resumable=True, mimetype="video/*")
-    request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-    response = None
-    while response is None:
-        status, response = request.next_chunk()
-        if status:
-            logger.info("Uploaded %d%%", int(status.progress() * 100))
-    logger.info("Upload Complete: %s", response.get("id"))
-    return response
+
+    media = MediaFileUpload(file_path, chunksize=-1, resumable=True)
+
+    try:
+        request = youtube.videos().insert(
+            part="snippet,status",
+            body=body,
+            media_body=media
+        )
+        response = None
+        while response is None:
+            try:
+                status, response = request.next_chunk()
+                if status:
+                    logger.info("Upload progress: %d%%", int(status.progress() * 100))
+            except HttpError as e:
+                if e.resp.status in [500, 502, 503, 504]:
+                    # retry on server errors
+                    logger.warning("Server error %d, retrying...", e.resp.status)
+                    time.sleep(5)
+                else:
+                    raise
+        logger.info("Upload successful! Video ID: %s", response.get("id"))
+        return response
+    except HttpError as e:
+        if e.resp.status == 403:
+            logger.error(
+                "403 Forbidden - YouTube Data API v3 might be disabled for your project. "
+                "Enable it here: https://console.developers.google.com/apis/api/youtube.googleapis.com/overview"
+            )
+        else:
+            logger.exception("Failed to upload video: %s", e)
+        raise
+    except Exception as e:
+        logger.exception("Unexpected error during upload: %s", e)
+        raise
+
+if __name__ == "__main__":
+    # quick test
+    file_path = "assets/output/short_test.mp4"
+    if os.path.exists(file_path):
+        upload_video(file_path, title="Test Upload", description="Testing YouTube Upload Script")
+    else:
+        logger.warning("Test video does not exist: %s", file_path)
